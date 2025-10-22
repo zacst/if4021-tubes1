@@ -39,31 +39,12 @@ float mean_interarrival;
 /* Hyperparameters */
 int num_hot_food_worker, num_specialty_sandwiches_worker, num_cashier;
 
-/* Constants */
-min_hot_food_st = 50; max_hot_food_st = 120;
-min_hot_food_act = 20; max_hot_food_act = 40;
-
-min_specialty_sandwiches_st = 60; max_specialty_sandwiches_st = 180;
-min_specialty_sandwiches_act = 5; max_specialty_sandwiches_act = 15;
-
-min_drinks_st = 5; max_drinks_st = 20;
-min_drinks_act = 5; max_drinks_act = 10;
-
-mean_interarrival = 30;
-
 /* Probability Variables */
 double prob_distrib_num_customers[4];
-prob_distrib_num_customers[1] = 0.5;
-prob_distrib_num_customers[2] = 0.8;
-prob_distrib_num_customers[3] = 0.9;
-prob_distrib_num_customers[4] = 1;
 
 int num_customers;
 
 double prob_distrib_routes[3];
-prob_distrib_routes[1] = 0.8;
-prob_distrib_routes[2] = 0.95;
-prob_distrib_routes[3] = 1;
 
 int route;
 
@@ -85,44 +66,6 @@ int map_route_int_to_event_type(int route_int) {
 
 // Base case: 1 hot food, 1 specialty sandwich, 2 cashier
 
-int main() /* Main function. */
-{
-    /* Initialize simlib */
-
-    init_simlib();
-    
-    /* Set maxatr = max(maximum number of attributes per record, 4) */
-
-    maxatr = 4;  /* NEVER SET maxatr TO BE SMALLER THAN 4. */
-
-    /* Initialize the model. */
-
-    init_model();
-
-    /* Service for 90 minutes */
-    while (sim_time <= 5400) {
-
-        /* Determine and move to next event. */
-        timing();
-
-        /* Invoke the appropriate event function. */
-        switch (next_event_type) {
-            case EVENT_ARRIVAL_CAFETERIA:
-                arrive_cafeteria();
-                break;
-            case EVENT_ARRIVAL_HOT_FOOD:
-                arrive_hot_food();
-                break;
-            case EVENT_ARRIVAL_SPECIALTY_SANDWICHES:
-                arrive_specialty_sandwiches();
-                break;
-            case EVENT_ARRIVAL_DRINKS:
-                arrive_drinks();
-                break;
-        }
-    }
-}
-
 void init_model(void) /* Initialization Function */
 {
     /* Receive Hyperparameter Input */
@@ -132,6 +75,28 @@ void init_model(void) /* Initialization Function */
     scanf("%d", &num_specialty_sandwiches_worker);
     printf("Number of Cashiers: ");
     scanf("%d", &num_cashier);
+
+    /* Constants */
+    min_hot_food_st = 50; max_hot_food_st = 120;
+    min_hot_food_act = 20; max_hot_food_act = 40;
+
+    min_specialty_sandwiches_st = 60; max_specialty_sandwiches_st = 180;
+    min_specialty_sandwiches_act = 5; max_specialty_sandwiches_act = 15;
+
+    min_drinks_st = 5; max_drinks_st = 20;
+    min_drinks_act = 5; max_drinks_act = 10;
+
+    mean_interarrival = 30;
+
+    /* Probability Variables */
+    prob_distrib_num_customers[1] = 0.5;
+    prob_distrib_num_customers[2] = 0.8;
+    prob_distrib_num_customers[3] = 0.9;
+    prob_distrib_num_customers[4] = 1;
+    
+    prob_distrib_routes[1] = 0.8;
+    prob_distrib_routes[2] = 0.95;
+    prob_distrib_routes[3] = 1;
 
     /* Determine the number of customers */
     num_customers = random_integer(prob_distrib_num_customers, STREAM_NUM_CUSTOMERS);
@@ -317,5 +282,43 @@ void depart_specialty_sandwiches(void) /* Depart from Specialty Sandwiches */
         list_remove(FIRST, LIST_QUEUE_SPECIALTY_SANDWICHES);
         /* Schedules to Drinks */
         event_schedule(sim_time, EVENT_ARRIVAL_DRINKS);
+    }
+}
+
+int main() /* Main function. */
+{
+    /* Initialize simlib */
+
+    init_simlib();
+    
+    /* Set maxatr = max(maximum number of attributes per record, 4) */
+
+    maxatr = 4;  /* NEVER SET maxatr TO BE SMALLER THAN 4. */
+
+    /* Initialize the model. */
+
+    init_model();
+
+    /* Service for 90 minutes */
+    while (sim_time <= 5400) {
+
+        /* Determine and move to next event. */
+        timing();
+
+        /* Invoke the appropriate event function. */
+        switch (next_event_type) {
+            case EVENT_ARRIVAL_CAFETERIA:
+                arrive_cafeteria();
+                break;
+            case EVENT_ARRIVAL_HOT_FOOD:
+                arrive_hot_food();
+                break;
+            case EVENT_ARRIVAL_SPECIALTY_SANDWICHES:
+                arrive_specialty_sandwiches();
+                break;
+            case EVENT_ARRIVAL_DRINKS:
+                arrive_drinks();
+                break;
+        }
     }
 }
