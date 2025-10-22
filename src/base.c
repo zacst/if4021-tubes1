@@ -229,7 +229,7 @@ void arrive_cashier(void) /* Arrival at Cashier */
             /* ACT time accumulated later at the cashier */
 
             /* Schedules time for departure with additional service time */            
-            event_schedule(sim_time + uniform(min_hot_food_st, max_hot_food_st, STREAM_HOT_FOOD_ST), EVENT_DEPARTURE_HOT_FOOD);
+            event_schedule(sim_time + uniform(min_hot_food_st, max_hot_food_st, STREAM_HOT_FOOD_ST), EVENT_DEPARTURE_CASHIER);
 
             /* Ends the search because a free worker has been found */
             return;
@@ -251,6 +251,30 @@ void arrive_cashier(void) /* Arrival at Cashier */
     /* 1. Departure from cashier? When does it end? */
     /* 2. Waiting time at cashier uses the time finished by previous person */
     /* 3. ACT time must be recorded at each route */
+}
+
+void depart_cashier(void)
+{
+    /* worker index stored in transfer[3] when the service was scheduled */
+    int cashier_idx = (int) transfer[3];
+
+    /* remove the customer from cashier (this also sets transfer[] to record) */
+    list_remove(FIRST, LIST_CASHIER + cashier_idx);
+    /* customer leaves system here — could collect statistics using sim_time & arrival times if desired */
+
+    /* if there is someone waiting in queue, start their service */
+    if (list_size[LIST_QUEUE_CASHIER + cashier_idx] > 0) {
+        /* dequeue next customer into transfer[] */
+        list_remove(FIRST, LIST_QUEUE_CASHIER + cashier_idx);
+        /* transfer[2] should contain that customer's ACT (as set when they were enqueued) */
+        transfer[3] = (double) cashier_idx;
+        list_file(FIRST, LIST_CASHIER + cashier_idx);
+        double service_time = transfer[2];
+        if (service_time <= 0.0) service_time = uniform(min_drinks_st, max_drinks_st, STREAM_DRINKS_ST);
+        event_schedule(sim_time + service_time, EVENT_DEPARTURE_CASHIER);
+    } else {
+        /* cashier now idle (no record in LIST_CASHIER) */
+    }
 }
 
 void depart_hot_food(void) /* Depart from Hot Food */
@@ -287,13 +311,14 @@ void depart_specialty_sandwiches(void) /* Depart from Specialty Sandwiches */
 
 int main() /* Main function. */
 {
-    /* Initialize simlib */
-
-    init_simlib();
-    
     /* Set maxatr = max(maximum number of attributes per record, 4) */
 
     maxatr = 4;  /* NEVER SET maxatr TO BE SMALLER THAN 4. */
+    maxlist = 20;  // ini apa njir kalau nilainya terlalu kecil error tapi terlalu besar juga error
+
+    /* Initialize simlib */
+
+    init_simlib();
 
     /* Initialize the model. */
 
@@ -307,18 +332,14 @@ int main() /* Main function. */
 
         /* Invoke the appropriate event function. */
         switch (next_event_type) {
-            case EVENT_ARRIVAL_CAFETERIA:
-                arrive_cafeteria();
-                break;
-            case EVENT_ARRIVAL_HOT_FOOD:
-                arrive_hot_food();
-                break;
-            case EVENT_ARRIVAL_SPECIALTY_SANDWICHES:
-                arrive_specialty_sandwiches();
-                break;
-            case EVENT_ARRIVAL_DRINKS:
-                arrive_drinks();
-                break;
+            case EVENT_ARRIVAL_CAFETERIA:              arrive_cafeteria(); break;
+            case EVENT_ARRIVAL_HOT_FOOD:               arrive_hot_food(); break;
+            case EVENT_DEPARTURE_HOT_FOOD:             depart_hot_food(); break;
+            case EVENT_ARRIVAL_SPECIALTY_SANDWICHES:   arrive_specialty_sandwiches(); break;
+            case EVENT_DEPARTURE_SPECIALTY_SANDWICHES: depart_specialty_sandwiches(); break;
+            case EVENT_ARRIVAL_DRINKS:                 arrive_drinks(); break;
+            case EVENT_ARRIVAL_CASHIER:                arrive_cashier(); break;
+            case EVENT_DEPARTURE_CASHIER:              depart_cashier(); break;
         }
     }
 }
