@@ -46,7 +46,7 @@ init_simlib ()
 {
 
 /* Initialize simlib.c.  List LIST_EVENT is reserved for event list, ordered by
-   event time.  init_simlib must be called from main by user. */
+    event time.  init_simlib must be called from main by user. */
 
   int list, listsize;
 
@@ -93,15 +93,16 @@ list_file (int option, int list)
 {
 
 /* Place transfr into list "list".
-   Update timest statistics for the list.
-   option = FIRST place at start of list
-            LAST  place at end of list
-            INCREASING  place in increasing order on attribute list_rank(list)
-            DECREASING  place in decreasing order on attribute list_rank(list)
-            (ties resolved by FIFO) */
+    Update timest statistics for the list.
+    option = FIRST place at start of list
+             LAST  place at end of list
+             INCREASING  place in increasing order on attribute list_rank(list)
+             DECREASING  place in decreasing order on attribute list_rank(list)
+             (ties resolved by FIFO) */
 
   struct master *row=NULL, *ahead, *behind, *ihead, *itail;
   int item, postest;
+  int i; // Used for copying loop
 
   /* If the list value is improper, stop the simulation. */
 
@@ -136,102 +137,106 @@ list_file (int option, int list)
     }
 
   else
-    {				/* There are other records in the list. */
+    {      /* There are other records in the list. */
 
       /* Check the value of option. */
 
       if ((option == INCREASING) || (option == DECREASING))
-	{
-	  item = list_rank[list];
-	  if (!((item >= 1) && (item <= maxatr)))
-	    {
-	      printf ("%d is an improper value for rank of list %d at time %f\n", item, list, sim_time);
-	      exit (1);
-	    }
+  {
+    item = list_rank[list];
+    if (!((item >= 1) && (item <= maxatr)))
+      {
+        printf ("%d is an improper value for rank of list %d at time %f\n", item, list, sim_time);
+        exit (1);
+      }
 
-	  row = head[list];
-	  behind = NULL;	/* Dummy value for the first iteration. */
+    row = head[list];
+    behind = NULL;  /* Dummy value for the first iteration. */
 
-	  /* Search for the correct location. */
+    /* Search for the correct location. */
 
-	  if (option == INCREASING)
-	    {
-	      postest = (transfer[item] >= (*row).value[item]);
-	      while (postest)
-		{
-		  behind = row;
-		  row = (*row).sr;
-		  postest = (behind != tail[list]);
-		  if (postest)
-		    postest = (transfer[item] >= (*row).value[item]);
-		}
-	    }
+    if (option == INCREASING)
+      {
+        postest = (transfer[item] >= (*row).value[item]);
+        while (postest)
+    {
+      behind = row;
+      row = (*row).sr;
+      postest = (behind != tail[list]);
+      if (postest)
+        postest = (transfer[item] >= (*row).value[item]);
+    }
+      }
 
-	  else
-	    {
+    else
+      {
 
-	      postest = (transfer[item] <= (*row).value[item]);
-	      while (postest)
-		{
-		  behind = row;
-		  row = (*row).sr;
-		  postest = (behind != tail[list]);
-		  if (postest)
-		    postest = (transfer[item] <= (*row).value[item]);
-		}
-	    }
+        postest = (transfer[item] <= (*row).value[item]);
+        while (postest)
+    {
+      behind = row;
+      row = (*row).sr;
+      postest = (behind != tail[list]);
+      if (postest)
+        postest = (transfer[item] <= (*row).value[item]);
+    }
+      }
 
-	  /* Check to see if position is first or last.  If so, take care of
-	     it below. */
+    /* Check to see if position is first or last.  If so, take care of
+        it below. */
 
-	  if (row == head[list])
+    if (row == head[list])
 
-	    option = FIRST;
+      option = FIRST;
 
-	  else
-	   if (behind == tail[list])
+    else
+     if (behind == tail[list])
 
-	    option = LAST;
+      option = LAST;
 
-	  else
-	    {			/* Insert between preceding and succeeding records. */
+    else
+      {      /* Insert between preceding and succeeding records. */
 
-	      ahead = (*behind).sr;
-	      row = (struct master *) malloc (sizeof (struct master));
-	      (*row).pr = behind;
-	      (*behind).sr = row;
-	      (*ahead).pr = row;
-	      (*row).sr = ahead;
-	    }
-	}			/* End if inserting in increasing or decreasing order. */
+        ahead = (*behind).sr;
+        row = (struct master *) malloc (sizeof (struct master));
+        (*row).pr = behind;
+        (*behind).sr = row;
+        (*ahead).pr = row;
+        (*row).sr = ahead;
+      }
+  }      /* End if inserting in increasing or decreasing order. */
 
       if (option == FIRST)
-	{
-	  row = (struct master *) malloc (sizeof (struct master));
-	  ihead = head[list];
-	  (*ihead).pr = row;
-	  (*row).sr = ihead;
-	  (*row).pr = NULL;
-	  head[list] = row;
-	}
+  {
+    row = (struct master *) malloc (sizeof (struct master));
+    ihead = head[list];
+    (*ihead).pr = row;
+    (*row).sr = ihead;
+    (*row).pr = NULL;
+    head[list] = row;
+  }
       if (option == LAST)
-	{
-	  row = (struct master *) malloc (sizeof (struct master));
-	  itail = tail[list];
-	  (*row).pr = itail;
-	  (*itail).sr = row;
-	  (*row).sr = NULL;
-	  tail[list] = row;
-	}
+  {
+    row = (struct master *) malloc (sizeof (struct master));
+    itail = tail[list];
+    (*row).pr = itail;
+    (*itail).sr = row;
+    (*row).sr = NULL;
+    tail[list] = row;
+  }
     }
 
-  /* Copy the data. */
+    // *** BUG FIX STARTS HERE: Correctly copy attribute data ***
+    /* This is the corrected section. Instead of just pointing to the global
+       `transfer` array, we allocate new memory for this list entry's attributes
+       and then copy the values from `transfer` into it. */
 
-  (*row).value = transfer;
+    (*row).value = (double *) calloc(maxatr + 1, sizeof(double));
+    for (i = 0; i <= maxatr; ++i) {
+        (*row).value[i] = transfer[i];
+    }
+    // *** BUG FIX ENDS HERE ***
 
-  /* Make room for new transfer. */
-
-  transfer = (double *) calloc (maxatr + 1, sizeof (double));
 
   /* Update the area under the number-in-list curve. */
 
@@ -243,11 +248,12 @@ list_remove (int option, int list)
 {
 
 /* Remove a record from list "list" and copy attributes into transfer.
-   Update timest statistics for the list.
-   option = FIRST remove first record in the list
-            LAST  remove last record in the list */
+    Update timest statistics for the list.
+    option = FIRST remove first record in the list
+             LAST  remove last record in the list */
 
   struct master *row = NULL, *ihead, *itail;
+  int i; // Used for copying loop
 
   /* If the list value is improper, stop the simulation. */
 
@@ -291,36 +297,45 @@ list_remove (int option, int list)
     {
 
       /* There is more than 1 record, so remove according to the desired
-         option. */
+          option. */
 
       switch (option)
-	{
+  {
 
-	  /* Remove the first record in the list. */
+  /* Remove the first record in the list. */
 
-	case FIRST:
-	  row = head[list];
-	  ihead = (*row).sr;
-	  (*ihead).pr = NULL;
-	  head[list] = ihead;
-	  break;
+  case FIRST:
+    row = head[list];
+    ihead = (*row).sr;
+    (*ihead).pr = NULL;
+    head[list] = ihead;
+    break;
 
-	  /* Remove the last record in the list. */
+  /* Remove the last record in the list. */
 
-	case LAST:
-	  row = tail[list];
-	  itail = (*row).pr;
-	  (*itail).sr = NULL;
-	  tail[list] = itail;
-	  break;
-	}
+  case LAST:
+    row = tail[list];
+    itail = (*row).pr;
+    (*itail).sr = NULL;
+    tail[list] = itail;
+    break;
+  }
     }
 
-  /* Copy the data and free memory. */
+    // *** BUG FIX STARTS HERE: Correctly copy attribute data ***
+    /* This is the corrected section. Instead of just making `transfer` point
+       to the memory from the list (which also orphans the old `transfer` memory,
+       causing a memory leak), we now copy the values from the list record's
+       attributes into the global `transfer` array. Then we free the memory
+       that was used by the list record and its attributes. */
 
-  free ((char *) transfer);
-  transfer = (*row).value;
-  free ((char *) row);
+    for(i = 0; i <= maxatr; ++i) {
+        transfer[i] = (*row).value[i];
+    }
+    free((char *) (*row).value);
+    free((char *) row);
+    // *** BUG FIX ENDS HERE ***
+
 
   /* Update the area under the number-in-list curve. */
 
@@ -332,8 +347,8 @@ timing ()
 {
 
 /* Remove next event from event list, placing its attributes in transfer.
-   Set sim_time (simulation time) to event time, transfer[1].
-   Set next_event_type to this event type, transfer[2]. */
+    Set sim_time (simulation time) to event time, transfer[1].
+    Set next_event_type to this event type, transfer[2]. */
 
   /* Remove the first event from the event list and put it in transfer[]. */
 
@@ -344,7 +359,7 @@ timing ()
   if (transfer[EVENT_TIME] < sim_time)
     {
       printf ("\nAttempt to schedule event type %f for time %f at time %f\n",
-	      transfer[EVENT_TYPE], transfer[EVENT_TIME], sim_time);
+        transfer[EVENT_TYPE], transfer[EVENT_TIME], sim_time);
       exit (1);
     }
 
@@ -359,9 +374,9 @@ event_schedule (double time_of_event, int type_of_event)
 {
 
 /* Schedule an event at time event_time of type event_type.  If attributes
-   beyond the first two (reserved for the event time and the event type) are
-   being used in the event list, it is the user's responsibility to place their
-   values into the transfer array before invoking event_schedule. */
+    beyond the first two (reserved for the event time and the event type) are
+    being used in the event list, it is the user's responsibility to place their
+    values into the transfer array before invoking event_schedule. */
 
   transfer[EVENT_TIME] = time_of_event;
   transfer[EVENT_TYPE] = type_of_event;
@@ -373,8 +388,8 @@ event_cancel (int event_type)
 {
 
 /* Remove the first event of type event_type from the event list, leaving its
-   attributes in transfer.  If something is cancelled, event_cancel returns 1;
-   if no match is found, event_cancel returns 0. */
+    attributes in transfer.  If something is cancelled, event_cancel returns 1;
+    if no match is found, event_cancel returns 0. */
 
   struct master *row, *ahead, *behind;
   static double high, low, value;
@@ -405,17 +420,17 @@ event_cancel (int event_type)
       /* Double check to see that this is a match. */
 
       if ((value > low) && (value < high))
-	{
-	  list_remove (LAST, LIST_EVENT);
-	  return 1;
-	}
+  {
+    list_remove (LAST, LIST_EVENT);
+    return 1;
+  }
 
-      else			/* no match */
-	return 0;
+      else      /* no match */
+  return 0;
     }
 
   /* Check to see if this is the head of the list.  If it is at the head, then
-     it MUST be a match. */
+      it MUST be a match. */
 
   if (row == head[LIST_EVENT])
     {
@@ -438,9 +453,9 @@ event_cancel (int event_type)
 
   /* Copy and free memory. */
 
-  free ((char *) transfer);	/* Free the old transfer. */
-  transfer = (*row).value;	/* Transfer the data. */
-  free ((char *) row);		/* Free the space vacated by row. */
+  free ((char *) transfer); /* Free the old transfer. */
+  transfer = (*row).value;  /* Transfer the data. */
+  free ((char *) row);    /* Free the space vacated by row. */
 
   /* Update the area under the number-in-event-list curve. */
 
@@ -453,15 +468,15 @@ sampst (double value, int variable)
 {
 
 /* Initialize, update, or report statistics on discrete-time processes:
-   sum/average, max (default -1E30), min (default 1E30), number of observations
-   for sampst variable "variable", where "variable":
-       = 0 initializes accumulators
-       > 0 updates sum, count, min, and max accumulators with new observation
-       < 0 reports stats on variable "variable" and returns them in transfer:
-           [1] = average of observations
-           [2] = number of observations
-           [3] = maximum of observations
-           [4] = minimum of observations */
+    sum/average, max (default -1E30), min (default 1E30), number of observations
+    for sampst variable "variable", where "variable":
+        = 0 initializes accumulators
+        > 0 updates sum, count, min, and max accumulators with new observation
+        < 0 reports stats on variable "variable" and returns them in transfer:
+            [1] = average of observations
+            [2] = number of observations
+            [3] = maximum of observations
+            [4] = minimum of observations */
 
   static int ivar, num_observations[SVAR_SIZE];
   static double max[SVAR_SIZE], min[SVAR_SIZE], sum[SVAR_SIZE];
@@ -477,26 +492,26 @@ sampst (double value, int variable)
   /* Execute the desired option. */
 
   if (variable > 0)
-    {				/* Update. */
+    {      /* Update. */
       sum[variable] += value;
       if (value > max[variable])
-	max[variable] = value;
+  max[variable] = value;
       if (value < min[variable])
-	min[variable] = value;
+  min[variable] = value;
       num_observations[variable]++;
       return 0.0;
     }
 
   if (variable < 0)
-    {				/* Report summary statistics in transfer. */
+    {      /* Report summary statistics in transfer. */
       ivar = -variable;
       transfer[2] = (double) num_observations[ivar];
       transfer[3] = max[ivar];
       transfer[4] = min[ivar];
       if (num_observations[ivar] == 0)
-	transfer[1] = 0.0;
+  transfer[1] = 0.0;
       else
-	transfer[1] = sum[ivar] / transfer[2];
+  transfer[1] = sum[ivar] / transfer[2];
       return transfer[1];
     }
 
@@ -518,16 +533,16 @@ timest (double value, int variable)
 {
 
 /* Initialize, update, or report statistics on continuous-time processes:
-   integral/average, max (default -1E30), min (default 1E30)
-   for timest variable "variable", where "variable":
-       = 0 initializes counters
-       > 0 updates area, min, and max accumulators with new level of variable
-       < 0 reports stats on variable "variable" and returns them in transfer:
-           [1] = time-average of variable updated to the time of this call
-           [2] = maximum value variable has attained
-           [3] = minimum value variable has attained
-   Note that variables TIM_VAR + 1 through TVAR_SIZE are used for automatic
-   record keeping on the length of lists 1 through MAX_LIST. */
+    integral/average, max (default -1E30), min (default 1E30)
+    for timest variable "variable", where "variable":
+        = 0 initializes counters
+        > 0 updates area, min, and max accumulators with new level of variable
+        < 0 reports stats on variable "variable" and returns them in transfer:
+            [1] = time-average of variable updated to the time of this call
+            [2] = maximum value variable has attained
+            [3] = minimum value variable has attained
+    Note that variables TIM_VAR + 1 through TVAR_SIZE are used for automatic
+    record keeping on the length of lists 1 through MAX_LIST. */
 
   int ivar;
   static double area[TVAR_SIZE], max[TVAR_SIZE], min[TVAR_SIZE], preval[TVAR_SIZE], tlvc[TVAR_SIZE], treset;
@@ -543,19 +558,19 @@ timest (double value, int variable)
   /* Execute the desired option. */
 
   if (variable > 0)
-    {				/* Update. */
+    {      /* Update. */
       area[variable] += (sim_time - tlvc[variable]) * preval[variable];
       if (value > max[variable])
-	max[variable] = value;
+  max[variable] = value;
       if (value < min[variable])
-	min[variable] = value;
+  min[variable] = value;
       preval[variable] = value;
       tlvc[variable] = sim_time;
       return 0.0;
     }
 
   if (variable < 0)
-    {				/* Report summary statistics in transfer. */
+    {      /* Report summary statistics in transfer. */
       ivar = -variable;
       area[ivar] += (sim_time - tlvc[ivar]) * preval[ivar];
       tlvc[ivar] = sim_time;
@@ -585,10 +600,10 @@ filest (int list)
 {
 
 /* Report statistics on the length of list "list" in transfer:
-       [1] = time-average of list length updated to the time of this call
-       [2] = maximum length list has attained
-       [3] = minimum length list has attained
-   This uses timest variable TIM_VAR + list. */
+        [1] = time-average of list length updated to the time of this call
+        [2] = maximum length list has attained
+        [3] = minimum length list has attained
+    This uses timest variable TIM_VAR + list. */
 
   return timest (0.0, -(TIM_VAR + list));
 }
@@ -598,17 +613,17 @@ out_sampst (FILE * unit, int lowvar, int highvar)
 {
 
 /* Write sampst statistics for variables lowvar through highvar on file
-   "unit". */
+    "unit". */
 
   int ivar, iatrr;
 
   if (lowvar > highvar || lowvar > MAX_SVAR || highvar > MAX_SVAR)
     return;
 
-  fprintf (unit, "\n sampst                         Number");
-  fprintf (unit, "\nvariable                          of");
-  fprintf (unit, "\n number       Average           values          Maximum");
-  fprintf (unit, "          Minimum");
+  fprintf (unit, "\n sampst                           Number");
+  fprintf (unit, "\nvariable                             of");
+  fprintf (unit, "\n number       Average         values         Maximum");
+  fprintf (unit, "         Minimum");
   fprintf (unit, "\n___________________________________");
   fprintf (unit, "_____________________________________");
   for (ivar = lowvar; ivar <= highvar; ++ivar)
@@ -616,7 +631,7 @@ out_sampst (FILE * unit, int lowvar, int highvar)
       fprintf (unit, "\n\n%5d", ivar);
       sampst (0.00, -ivar);
       for (iatrr = 1; iatrr <= 4; ++iatrr)
-	pprint_out (unit, iatrr);
+  pprint_out (unit, iatrr);
     }
   fprintf (unit, "\n___________________________________");
   fprintf (unit, "_____________________________________\n\n\n");
@@ -627,7 +642,7 @@ out_timest (FILE * unit, int lowvar, int highvar)
 {
 
 /* Write timest statistics for variables lowvar through highvar on file
-   "unit". */
+    "unit". */
 
   int ivar, iatrr;
 
@@ -636,15 +651,15 @@ out_timest (FILE * unit, int lowvar, int highvar)
 
 
   fprintf (unit, "\n  timest");
-  fprintf (unit, "\n variable       Time");
-  fprintf (unit, "\n  number       average          Maximum          Minimum");
+  fprintf (unit, "\n variable     Time");
+  fprintf (unit, "\n  number     average         Maximum         Minimum");
   fprintf (unit, "\n________________________________________________________");
   for (ivar = lowvar; ivar <= highvar; ++ivar)
     {
       fprintf (unit, "\n\n%5d", ivar);
       timest (0.00, -ivar);
       for (iatrr = 1; iatrr <= 3; ++iatrr)
-	pprint_out (unit, iatrr);
+  pprint_out (unit, iatrr);
     }
   fprintf (unit, "\n________________________________________________________");
   fprintf (unit, "\n\n\n");
@@ -655,7 +670,7 @@ out_filest (FILE * unit, int lowlist, int highlist)
 {
 
 /* Write timest list-length statistics for lists lowlist through highlist on
-   file "unit". */
+    file "unit". */
 
   int list, iatrr;
 
@@ -663,22 +678,22 @@ out_filest (FILE * unit, int lowlist, int highlist)
     return;
 
   fprintf (unit, "\n  File         Time");
-  fprintf (unit, "\n number       average          Maximum          Minimum");
+  fprintf (unit, "\n number     average         Maximum         Minimum");
   fprintf (unit, "\n_______________________________________________________");
   for (list = lowlist; list <= highlist; ++list)
     {
       fprintf (unit, "\n\n%5d", list);
       filest (list);
       for (iatrr = 1; iatrr <= 3; ++iatrr)
-	pprint_out (unit, iatrr);
+  pprint_out (unit, iatrr);
     }
   fprintf (unit, "\n_______________________________________________________");
   fprintf (unit, "\n\n\n");
 }
 
 void
-pprint_out (FILE * unit, int i)	/* Write ith entry in transfer to file
-				   "unit". */
+pprint_out (FILE * unit, int i) /* Write ith entry in transfer to file
+          "unit". */
 {
   if (transfer[i] == -1e30 || transfer[i] == 1e30)
     fprintf (unit, " %#15.6G ", 0.00);
@@ -687,16 +702,16 @@ pprint_out (FILE * unit, int i)	/* Write ith entry in transfer to file
 }
 
 double
-expon (double mean, int stream)	/* Exponential variate generation
-				   function. */
+expon (double mean, int stream) /* Exponential variate generation
+          function. */
 {
   return -mean * log (lcgrand (stream));
 
 }
 
 int
-random_integer (double prob_distrib[], int stream)	/* Discrete-variate
-							   generation function. */
+random_integer (double prob_distrib[], int stream)  /* Discrete-variate
+                          generation function. */
 {
   int i;
   double u;
@@ -709,15 +724,15 @@ random_integer (double prob_distrib[], int stream)	/* Discrete-variate
 }
 
 double
-uniform (double a, double b, int stream)	/* Uniform variate generation
-						   function. */
+uniform (double a, double b, int stream)  /* Uniform variate generation
+                      function. */
 {
   return a + lcgrand (stream) * (b - a);
 }
 
 double
-erlang (int m, double mean, int stream)	/* Erlang variate generation
-					   function. */
+erlang (int m, double mean, int stream) /* Erlang variate generation
+                       function. */
 {
   int i;
   double mean_exponential, sum;
@@ -731,34 +746,34 @@ erlang (int m, double mean, int stream)	/* Erlang variate generation
 
 /* Prime modulus multiplicative linear congruential generator
 
-   Z[i] = (630360016 * Z[i-1]) (mod(pow(2,31) - 1)), based on Marse and
-   Roberts' portable FORTRAN random-number generator UNIRAN.  Multiple
-   (100) streams are supported, with seeds spaced 100,000 apart.
-   Throughout, input argument "stream" must be an int giving the
-   desired stream number.  The header file lcgrand.h must be included in
-   the calling program (#include "lcgrand.h") before using these
-   functions.
+    Z[i] = (630360016 * Z[i-1]) (mod(pow(2,31) - 1)), based on Marse and
+    Roberts' portable FORTRAN random-number generator UNIRAN.  Multiple
+    (100) streams are supported, with seeds spaced 100,000 apart.
+    Throughout, input argument "stream" must be an int giving the
+    desired stream number.  The header file lcgrand.h must be included in
+    the calling program (#include "lcgrand.h") before using these
+    functions.
 
-   Usage: (Three functions)
+    Usage: (Three functions)
 
-   1. To obtain the next U(0,1) random number from stream "stream,"
-      execute
-          u = lcgrand(stream);
-      where lcgrand is a double function.  The double variable u will
-      contain the next random number.
+    1. To obtain the next U(0,1) random number from stream "stream,"
+       execute
+           u = lcgrand(stream);
+       where lcgrand is a double function.  The double variable u will
+       contain the next random number.
 
-   2. To set the seed for stream "stream" to a desired value zset,
-      execute
-          lcgrandst(zset, stream);
-      where lcgrandst is a void function and zset must be a long set to
-      the desired seed, a number between 1 and 2147483646 (inclusive).
-      Default seeds for all 100 streams are given in the code.
+    2. To set the seed for stream "stream" to a desired value zset,
+       execute
+           lcgrandst(zset, stream);
+       where lcgrandst is a void function and zset must be a long set to
+       the desired seed, a number between 1 and 2147483646 (inclusive).
+       Default seeds for all 100 streams are given in the code.
 
-   3. To get the current (most recently used) integer in the sequence
-      being generated for stream "stream" into the long variable zget,
-      execute
-          zget = lcgrandgt(stream);
-      where lcgrandgt is a long function. */
+    3. To get the current (most recently used) integer in the sequence
+       being generated for stream "stream" into the long variable zget,
+       execute
+           zget = lcgrandgt(stream);
+       where lcgrandgt is a long function. */
 
 /* Define the constants. */
 
@@ -811,14 +826,14 @@ lcgrand (int stream)
 }
 
 void
-lcgrandst (long zset, int stream)	/* Set the current zrng for stream
-					   "stream" to zset. */
+lcgrandst (long zset, int stream) /* Set the current zrng for stream
+          "stream" to zset. */
 {
   zrng[stream] = zset;
 }
 
 long
-lcgrandgt (int stream)		/* Return the current zrng for stream "stream". */
+lcgrandgt (int stream)    /* Return the current zrng for stream "stream". */
 {
   return zrng[stream];
 }
